@@ -20,7 +20,7 @@
 
 **UI:** Jetpack Compose  
 
-**Архитектура:** MVVM + Clean Architecture  
+**Архитектура:** MVVM
 
 **Зависимости:** Hilt (DI), Navigation Component  
 
