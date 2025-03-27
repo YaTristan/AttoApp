@@ -1,7 +1,5 @@
 package com.example.attoapp.domain
 
-import android.util.Log
-import androidx.compose.runtime.mutableStateListOf
 import com.example.attoapp.data.Brands
 import com.example.attoapp.data.CartItem
 import com.example.attoapp.data.MergedProductsBrands
@@ -21,8 +19,7 @@ fun searchListOfBrand(
 
 }
 
-fun mergePromotions(
-    promotions: List<Promotions>,
+fun List<Promotions>.mergeWithProducts(
     promotionProducts: List<Promotion>,
     allProducts: List<MergedProductsBrands>
 ): List<MergedPromotions> {
@@ -30,7 +27,7 @@ fun mergePromotions(
     val productMap = allProducts.associateBy { it.id }  // O(n)
     val promotionMap = promotionProducts.associate { it.promotion_id to it.product_ids } // O(n)
 
-    return promotions.mapNotNull { promo ->
+    return this.mapNotNull { promo ->
         val productIds = promotionMap[promo.id] ?: emptyList()
         val products = productIds.mapNotNull { productMap[it] } // O(1) доступ к каждому продукту
 
@@ -45,16 +42,14 @@ fun mergePromotions(
     }
 }
 
-
-fun mergeBrandsAndProducts(
+fun List<Products>.mergeWithBrands(
     reviews: List<Reviews>,
-    brands: List<Brands>,
-    allProducts: List<Products>
+    brands: List<Brands>
 ): List<MergedProductsBrands> {
 
     val brandMap = brands.associateBy({ it.id }, { it.name })  // O(n)
 
-    return allProducts.map { product ->
+    return this.map { product ->
         val brandName = brandMap[product.brand_id] ?: "Неизвестный бренд"
         MergedProductsBrands(
             id = product.id,
@@ -65,25 +60,24 @@ fun mergeBrandsAndProducts(
             brand_id = product.brand_id,
             description = product.description,
             review = bestReview(reviews = reviews, product.id),
-            sizes = createListOfSizes(product.sizes)
+            sizes = product.sizes.toSizeList()
         )
     }
 }
 
 
-fun mergeFavorite(
-    user: User,
+fun User.mergeFavorite(
     brands: List<Brands>,
     allProducts: List<MergedProductsBrands>
 ): User {
 
-    val favoriteProductIds = splitFavorite(user.favorite_product ?: "").toSet()  // O(n)
-    val favoriteShopIds = splitFavorite(user.favorite_shop ?: "").toSet()  // O(n)
+    val favoriteProductIds = splitFavorite(this.favorite_product ?: "").toSet()  // O(n)
+    val favoriteShopIds = splitFavorite(this.favorite_shop ?: "").toSet()  // O(n)
 
     val favoriteProductsInfo = allProducts.filter { it.id in favoriteProductIds }  // O(n)
     val favoriteShopsInfo = brands.filter { it.id in favoriteShopIds }  // O(n)
 
-    val cartItems = user.cart?.split(Regex("\\s*,\\s*|\\s+"))?.mapNotNull { it.trim() } ?: emptyList()
+    val cartItems = this.cart?.split(Regex("\\s*,\\s*|\\s+"))?.mapNotNull { it.trim() } ?: emptyList()
 
     val result = cartItems.chunked(4).mapNotNull { chunk ->
         if (chunk.size == 4) {
@@ -104,7 +98,7 @@ fun mergeFavorite(
         } else null
     }
 
-    return user.copy(
+    return this.copy(
         favorite_productsInfo = favoriteProductsInfo,
         favorite_shopInfo = favoriteShopsInfo,
         cartInfo = result
@@ -112,20 +106,12 @@ fun mergeFavorite(
 }
 
 
-
-fun createListOfSizes(
-    sizes : String
-) : List<Int> {
+fun String.toSizeList(): List<Int> {
     val result = mutableListOf<Int>()
-    val sizeParts = sizes.split(",")
-
-    for (part in sizeParts) {
-        if(part.contains("-")) {
-            val rangeParts = part.split("-")
-            val start = rangeParts[0].toInt()
-            val end = rangeParts[1].toInt()
-
-            result.addAll((start..end).toList())
+    this.split(",").forEach { part ->
+        if ("-" in part) {
+            val (start, end) = part.split("-").map { it.toInt() }
+            result.addAll(start..end)
         } else {
             result.add(part.toInt())
         }
@@ -133,9 +119,9 @@ fun createListOfSizes(
     return result
 }
 
-fun brandsForCatalog(brandList: List<Brands>): List<Pair<String, List<Brands>>> {
-    return brandList
-        .sortedBy { it.name }
+
+fun List<Brands>.groupForCatalog(): List<Pair<String, List<Brands>>> {
+    return this.sortedBy { it.name }
         .groupBy { it.name[0].uppercaseChar() }
         .map { (letter, brands) -> letter.toString() to brands }
 }

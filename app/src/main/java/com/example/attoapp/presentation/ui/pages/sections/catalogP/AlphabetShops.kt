@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberImagePainter
 import com.example.attoapp.R
-import com.example.attoapp.domain.brandsForCatalog
+import com.example.attoapp.domain.groupForCatalog
 import com.example.attoapp.presentation.viewmodel.DataViewModel
 import com.example.attoapp.ui.theme.AccentColor
 import com.example.attoapp.ui.theme.OsnTextColor
@@ -39,7 +39,7 @@ fun AlphabetShops(viewModel : DataViewModel) {
 
     val brands by viewModel.brands.collectAsState()
 
-    val brandsAlphabet by remember(brands) { mutableStateOf(brandsForCatalog(brands)) }
+    val brandsAlphabet = brands.groupForCatalog()
     LazyColumn(modifier = Modifier
         .fillMaxWidth(0.9f)
         .padding(start = 10.dp ,top = 24.dp)) {

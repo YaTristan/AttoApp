@@ -13,8 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.lifecycleScope
-import com.example.attoapp.domain.stripe.PaymentRequest
-import com.example.attoapp.domain.stripe.StripeInstance
 import com.example.attoapp.presentation.navigation.AppNavigation
 import com.example.attoapp.presentation.viewmodel.DataViewModel
 import com.example.attoapp.ui.theme.AttoAppTheme

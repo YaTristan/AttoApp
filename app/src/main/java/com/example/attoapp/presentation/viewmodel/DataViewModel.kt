@@ -17,17 +17,11 @@ import com.example.attoapp.data.User
 import com.example.attoapp.data.UserPreferences
 import com.example.attoapp.domain.GetUseCase
 import com.example.attoapp.domain.makeItFavorite
-import com.example.attoapp.domain.mergeBrandsAndProducts
 import com.example.attoapp.domain.mergeFavorite
-import com.example.attoapp.domain.mergePromotions
+import com.example.attoapp.domain.mergeWithBrands
+import com.example.attoapp.domain.mergeWithProducts
 import com.example.attoapp.domain.photoForReview
-import com.example.attoapp.domain.stripe.PaymentRequest
-import com.example.attoapp.domain.stripe.StripeInstance
-import com.stripe.android.model.ConfirmPaymentIntentParams
-import com.stripe.android.payments.paymentlauncher.PaymentLauncher
-import com.stripe.android.payments.paymentlauncher.PaymentResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,32 +96,28 @@ class DataViewModel @Inject constructor(
     private val _userInfo = MutableStateFlow<User?>(null)
     val userInfo : StateFlow<User?> = _userInfo
     private val _productsWithBrands = MutableStateFlow<List<MergedProductsBrands>>(emptyList())
-    val productsWithBrands : StateFlow<List<MergedProductsBrands>> =
+    val productsWithBrands: StateFlow<List<MergedProductsBrands>> =
         combineTransform(
-            _reviews ,
-            _brands ,
-            _products ,
+            _reviews,
+            _brands,
+            _products,
             _userInfo
-        ) { reviews ,brands ,products ,user ->
+        ) { reviews, brands, products, user ->
             if (products.isEmpty() || brands.isEmpty()) return@combineTransform
             val favoriteIds = user?.favorite_productsInfo?.map { it.id }?.toSet() ?: emptySet()
             emit(
-                mergeBrandsAndProducts(
-                    reviews ,
-                    brands ,
-                    products
-                ).map { it.copy(isFavorite = it.id in favoriteIds) })
-        }.stateIn(viewModelScope ,SharingStarted.WhileSubscribed(5000) ,emptyList())
+                products.mergeWithBrands(reviews, brands)
+                    .map { it.copy(isFavorite = it.id in favoriteIds) }
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val promotionsWithProducts : StateFlow<List<MergedPromotions>> =
-        combine(_promotions ,_promotion ,productsWithBrands) { promotions ,promotion ,products ->
-            mergePromotions(promotions ,promotion ,products)
-        }.stateIn(viewModelScope ,SharingStarted.Lazily ,emptyList())
+    val promotionsWithProducts: StateFlow<List<MergedPromotions>> =
+        combine(_promotions, _promotion, productsWithBrands) { promotions, promotion, products ->
+            promotions.mergeWithProducts(promotion, products)
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun fetchUserInfo() {
         viewModelScope.launch {
-
-            // Создаем бесконечный цикл для обновления данных
             while (true) {
                 fetchBrands()
                 fetchProducts()
@@ -137,27 +127,24 @@ class DataViewModel @Inject constructor(
                 val userIdValue = userId.value
                 if (userIdValue != null) {
                     val user = getUseCase.executeUserInfo(userIdValue)
-
                     productsWithBrands.collect { products ->
                         if (products.isNotEmpty() && user != null) {
                             val brandsValue = brands.value
                             if (brandsValue != null) {
-                                val updatedUser = mergeFavorite(user ,brandsValue ,products)
+                                val updatedUser = user.mergeFavorite(brandsValue, products)
                                 _userInfo.value = updatedUser
 
                                 updateAllSelectedState()
-                                _productsWithFavorites.value = makeItFavorite(products ,user)
+                                _productsWithFavorites.value = makeItFavorite(products, user)
                             }
                         }
                     }
-
                 }
-
-                // Задержка на 5 минут (300000 миллисекунд)
                 delay(100000)
             }
         }
     }
+
 
 
     fun updateCurrentNavIcon(index : Int) {
@@ -225,7 +212,7 @@ class DataViewModel @Inject constructor(
         newList[index] = updatedItem
         _userInfo.value = _userInfo.value!!.copy(cartInfo = newList)
 
-        CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch {
             try {
                 val response = RetrofitInstance.apiService.updateFavorite(
                     FavoriteUpdate(
